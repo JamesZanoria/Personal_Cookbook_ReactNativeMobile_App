@@ -226,9 +226,18 @@ export default function CookbookScreen({ navigation, route }) {
     };
 
     const handleCreateCollection = async (name, description) => {
-        const newCollection = await collectionAPI.create({ name, description });
-        setCollections((prev) => [newCollection, ...prev]);
-        showToast('Collection created!');
+        try {
+            const payload = {
+                name,
+                description,
+                user_id: user?.id,
+            };
+            const newCollection = await collectionAPI.create(payload);
+            setCollections((prev) => [newCollection, ...prev]);
+            showToast('Collection created!');
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
     };
 
     const handleDeleteCollection = (collection) => {

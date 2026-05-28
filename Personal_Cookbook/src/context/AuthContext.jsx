@@ -31,20 +31,34 @@ export function AuthProvider({ children }){
 
     // Register
     const register = async (name, email, password) => {
-        const { token: t, user: u } = await authAPI.register(name, email, password);
-        await Storage.setToken(t);
-        await Storage.setUser(u);
-        setToken(t);
-        setUser(u);
+        const data = await authAPI.register(name, email, password);
+        const session = data.session;
+        const userProfile = data.user;
+
+        if (session?.access_token) {
+            await Storage.setToken(session.access_token);
+        }
+        if (userProfile) {
+            await Storage.setUser(userProfile);
+        }
+        setToken(session?.access_token || null);
+        setUser(userProfile || null);
     };
 
     // Login
     const login = async (email, password) => {
-        const { token: t, user: u } = await authAPI.login(email, password);
-        await Storage.setToken(t);
-        await Storage.setUser(u);
-        setToken(t);
-        setUser(u);
+        const data = await authAPI.login(email, password);
+        const session = data.session;
+        const userProfile = data.user;
+
+        if (session?.access_token) {
+            await Storage.setToken(session.access_token);
+        }
+        if (userProfile) {
+            await Storage.setUser(userProfile);
+        }
+        setToken(session?.access_token || null);
+        setUser(userProfile || null);
     };
 
     // Logout

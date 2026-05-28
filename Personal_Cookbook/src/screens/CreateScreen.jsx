@@ -191,7 +191,12 @@ export default function CreateScreen({ navigation, route }) {
                 showToast('Recipe updated!');
                 navigation.goBack();
             } else {
-                await recipesAPI.create(payload);
+                // Link the recipe to the logged-in user
+                const payloadWithUser = {
+                    ...payload,
+                    user_id: user?.id,
+                };
+                await recipesAPI.create(payloadWithUser);
                 showToast(publish ? 'Recipe published!' : 'Draft saved!');
                 resetForm();
             }

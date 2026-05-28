@@ -1,37 +1,33 @@
-import { Storage } from '../utils/storage';
-import { Platform } from 'react-native';
+import { supabase } from '../../supabase';
 
-const FALLBACK_API_BASE_URL = Platform.select({
-    ios: 'http://localhost:3001/api',
-    android: 'http://10.0.2.2:3001/api',
-    default: 'http://localhost:3001/api',
-});
-
-const API_BASE_URL =
-    process.env.EXPO_PUBLIC_API_BASE_URL?.trim() || FALLBACK_API_BASE_URL;
-
-// Upload a local image URI to the server
 export const uploadImage = async (localUri) => {
-    const token = await Storage.getToken();
-    const filename = localUri.split('/').pop();
-    const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1]}` : 'image/jpeg';
+    try {
+        // 1. Convert local image URI to blob
+        const response = await fetch(localUri);
+        const blob = await response.blob();
 
-    const formData = new FormData();
-    formData.append('image', { uri: localUri, name: filename, type });
+        // 2. Generate a unique filename
+        const fileExt = localUri.split('.').pop().toLowerCase();
+        const fileName = `uploads/${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt || 'jpg'}`;
 
-    const response = await fetch(`${API_BASE_URL}/uploads/image`, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-    });
+        // 3. Upload to Supabase Storage bucket 'uploads'
+        const { data, error } = await supabase.storage
+            .from('uploads')
+            .upload(fileName, blob, {
+                contentType: `image/${fileExt || 'jpg'}`,
+                upsert: true
+            });
 
-    if(!response.ok){
-        const err = await response.json();
-        throw new Error(err.error || 'Upload failed');
+        if (error) throw error;
+
+        // 4. Get the public URL for the uploaded file
+        const { data: { publicUrl } } = supabase.storage
+            .from('uploads')
+            .getPublicUrl(fileName);
+
+        return { url: publicUrl };
+    } catch (error) {
+        console.error('Upload error:', error);
+        throw new Error(error.message || 'Upload failed');
     }
-
-    return response.json();
 };

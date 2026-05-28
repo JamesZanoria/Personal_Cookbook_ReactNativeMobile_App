@@ -43,24 +43,33 @@ export default function ProfileScreen({ navigation }) {
     const handleSave = async () => {
         if (!name.trim()) { showToast('Name cannot be empty', 'error'); return; }
 
-        if (showPasswordSection && newPassword) {
-            if (!currentPassword) { showToast('Enter your current password', 'error'); return; }
-            if (newPassword.length < 6) { showToast('New password must be at least 6 characters', 'error'); return; }
-            if (newPassword !== confirmPassword) { showToast('Passwords do not match', 'error'); return; }
-        }
-
         try {
             setSaving(true);
-            const payload = { name: name.trim(), avatar_url: avatarUrl || null };
+
+            // 1. Update the public profile (Name and Avatar)
+            const profilePayload = {
+                name: name.trim(),
+                avatar_url: avatarUrl || null
+            };
+            const updated = await authAPI.updateMe(profilePayload);
+
+            // 2. Handle password change separately using official Supabase Auth
             if (showPasswordSection && newPassword) {
-                payload.currentPassword = currentPassword;
-                payload.newPassword     = newPassword;
+                if (newPassword.length < 6) {
+                    showToast('New password must be at least 6 characters', 'error');
+                    setSaving(false);
+                    return;
+                }
+                if (newPassword !== confirmPassword) {
+                    showToast('Passwords do not match', 'error');
+                    setSaving(false);
+                    return;
+                }
+
+                await authAPI.changePassword(newPassword);
             }
 
-            const updated = await authAPI.updateMe(payload);
-
-            // updateUser writes to SecureStore AND updates AuthContext so every
-            // screen that reads `user` from useAuth() re-renders automatically.
+            // Update local state
             await updateUser({ name: updated.name, avatar_url: updated.avatar_url });
 
             setEditMode(false);

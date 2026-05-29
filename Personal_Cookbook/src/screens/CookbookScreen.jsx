@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ImageBackground, Image, RefreshControl, TextInput, Modal, ActivityIndicator, Alert, } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useRecipes } from '../hooks/useRecipes';
@@ -101,22 +102,29 @@ function CollectionPickerModal({ visible, onClose, collections, onSelect, select
                         {selectedRecipe?.title || 'Select a collection'}
                     </Text>
 
-                    {/* This list wires recipe-to-collection assignment into the saved/cookbook flow. */}
-                    {collections.length ? collections.map((collection) => (
-                        <TouchableOpacity
-                            key={collection.id}
-                            style={pickerStyles.item}
-                            onPress={() => onSelect(collection)}
-                            activeOpacity={0.88}
-                        >
-                            <Feather name="folder" size={16} color={COLORS.green} />
-                            <View style={{ flex: 1 }}>
-                                <Text style={pickerStyles.itemTitle}>{collection.name}</Text>
-                                <Text style={pickerStyles.itemSub}>{collection.recipe_count || 0} recipes</Text>
-                            </View>
-                            <Feather name="plus" size={16} color={COLORS.muted} />
-                        </TouchableOpacity>
-                    )) : (
+                    {collections.length ? collections.map((collection) => {
+                        const isAlreadyAdded = collection.recipes?.some(r => r.id === selectedRecipe?.id);
+                        return (
+                            <TouchableOpacity
+                                key={collection.id}
+                                style={[pickerStyles.item, isAlreadyAdded && { backgroundColor: COLORS.greenLight, borderColor: COLORS.green }]}
+                                onPress={() => !isAlreadyAdded && onSelect(collection)}
+                                activeOpacity={0.88}
+                                disabled={isAlreadyAdded}
+                            >
+                                <Feather name="folder" size={16} color={COLORS.green} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[pickerStyles.itemTitle, isAlreadyAdded && { color: COLORS.green }]}>{collection.name}</Text>
+                                    <Text style={pickerStyles.itemSub}>{collection.recipe_count || 0} recipes</Text>
+                                </View>
+                                {isAlreadyAdded ? (
+                                    <Ionicons name="checkmark-circle" size={16} color={COLORS.green} />
+                                ) : (
+                                    <Feather name="plus" size={16} color={COLORS.muted} />
+                                )}
+                            </TouchableOpacity>
+                        );
+                    }) : (
                         <View style={styles.emptyCard}>
                             <Text style={styles.emptyCardTitle}>Create a collection first</Text>
                             <Text style={styles.emptyCardText}>Collections appear here once you make one.</Text>
@@ -185,10 +193,6 @@ export default function CookbookScreen({ navigation, route }) {
     const [profileMenuVisible, setProfileMenuVisible] = useState(false);
     const [viewMode, setViewMode] = useState('list');
 
-    const allQuery = useRecipes('feed');
-    const savedQuery = useRecipes('saved');
-    const mineQuery = useRecipes('mine');
-
     const loadCollections = useCallback(async () => {
         try {
             setColsLoading(true);
@@ -201,6 +205,33 @@ export default function CookbookScreen({ navigation, route }) {
             setColsLoading(false);
         }
     }, []);
+
+    const allQuery = useRecipes('feed');
+    const savedQuery = useRecipes('saved');
+    const mineQuery = useRecipes('mine');
+
+    const refreshRefs = useRef({
+        all: allQuery.refresh,
+        saved: savedQuery.refresh,
+        mine: mineQuery.refresh,
+    });
+
+    useEffect(() => {
+        refreshRefs.current = {
+            all: allQuery.refresh,
+            saved: savedQuery.refresh,
+            mine: mineQuery.refresh,
+        };
+    }, [allQuery, savedQuery, mineQuery]);
+
+    useFocusEffect(
+        useCallback(() => {
+            refreshRefs.current.all();
+            refreshRefs.current.saved();
+            refreshRefs.current.mine();
+            loadCollections();
+        }, [loadCollections])
+    );
 
     useEffect(() => {
         loadCollections();
@@ -232,9 +263,18 @@ export default function CookbookScreen({ navigation, route }) {
                 description,
                 user_id: user?.id,
             };
-            const newCollection = await collectionAPI.create(payload);
-            setCollections((prev) => [newCollection, ...prev]);
-            showToast('Collection created!');
+            const result = await collectionAPI.create(payload);
+
+            // Supabase .select() returns an array of inserted rows
+            const newCollection = Array.isArray(result) ? result[0] : result;
+
+            if (newCollection) {
+                setCollections((prev) => [newCollection, ...prev]);
+                showToast('Collection created!');
+            }
+
+            // Refresh to sync server-side counts and state
+            await loadCollections();
         } catch (error) {
             showToast(error.message, 'error');
         }
@@ -280,12 +320,25 @@ export default function CookbookScreen({ navigation, route }) {
     const handlePickCollection = async (collection) => {
         if (!selectedRecipe) return;
         try {
+            // Optimistically update collection count
+            setCollections((prev) =>
+                prev.map(col =>
+                    col.id === collection.id
+                        ? { ...col, recipe_count: (col.recipe_count || 0) + 1 }
+                        : col
+                )
+            );
+
             await collectionAPI.addRecipe(collection.id, selectedRecipe.id);
             setShowPickerModal(false);
             setSelectedRecipe(null);
+
+            // Refresh collections to get accurate server-side counts and synced recipe lists
             await loadCollections();
             showToast(`Added to ${collection.name}`);
         } catch (error) {
+            // Revert on error
+            await loadCollections();
             showToast(error.message, 'error');
         }
     };

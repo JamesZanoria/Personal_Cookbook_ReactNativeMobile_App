@@ -169,6 +169,8 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.42)',
         justifyContent: 'flex-start',
         alignItems: 'flex-start',
+        paddingTop: 60,
+        paddingLeft: 20,
     },
     popover: {
         backgroundColor: COLORS.cream,

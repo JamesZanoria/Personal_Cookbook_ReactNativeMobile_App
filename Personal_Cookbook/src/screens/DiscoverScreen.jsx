@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Image, StyleSheet, RefreshControl, FlatList, ActivityIndicator, ScrollView, Modal, Alert, } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useRecipes } from '../hooks/useRecipes';
@@ -57,7 +58,7 @@ function FeaturedCard({ recipe, onPress }) {
                 <View style={styles.featuredMetrics}>
                     <View style={styles.metricItem}>
                         <Ionicons name="star" size={12} color={COLORS.gold} />
-                        <Text style={styles.metricText}>{recipe.avg_rating || '5.0'}</Text>
+                        <Text style={styles.metricText}>{recipe.avg_rating || '0.0'}</Text>
                     </View>
                     <View style={styles.metricSeparator} />
                     <View style={styles.metricItem}>
@@ -206,6 +207,12 @@ export default function DiscoverScreen({ navigation }) {
     const feedQuery   = useRecipes('feed');
     const savedQuery  = useRecipes('saved');
 
+    useFocusEffect(
+        useCallback(() => {
+            feedQuery.refresh();
+        }, [feedQuery.refresh])
+    );
+
     const updateOverlayPos = useCallback(() => {
         if (searchRowRef.current) {
             searchRowRef.current.measure((x, y, width, height, pageX, pageY) => {
@@ -237,7 +244,10 @@ export default function DiscoverScreen({ navigation }) {
         new Set(savedQuery.recipes.map(r => r.id)), [savedQuery.recipes]);
 
     const allRecipes = useMemo(() =>
-        feedQuery.recipes.map(r => ({ ...r, is_saved: savedIds.has(r.id) })),
+        feedQuery.recipes.map(r => ({
+            ...r,
+            is_saved: r.is_saved ?? savedIds.has(r.id)
+        })),
         [feedQuery.recipes, savedIds]);
 
     const hasActiveFilter = Boolean(debouncedSearch || activeCategory);
@@ -619,7 +629,10 @@ export default function DiscoverScreen({ navigation }) {
 
             {suggestionsVisible && currentInput.length > 0 && suggestions.length > 0 && (
                 <>
-                    <View style={styles.rootBackdrop} />
+                    <View
+                        style={styles.rootBackdrop}
+                        pointerEvents="box-none"
+                    />
                     <View style={[styles.suggestionsOverlay, {
                         top: overlayPos.top,
                         left: overlayPos.left,
@@ -1130,8 +1143,6 @@ const styles = StyleSheet.create({
     },
     suggestionsOverlay: {
         position: 'absolute',
-        left: 0,
-        right: 0,
         backgroundColor: COLORS.white,
         borderRadius: 12,
         paddingVertical: 4,

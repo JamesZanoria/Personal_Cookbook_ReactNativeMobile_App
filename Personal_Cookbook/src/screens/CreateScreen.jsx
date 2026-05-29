@@ -120,8 +120,12 @@ export default function CreateScreen({ navigation, route }) {
 
     // Upload a photo for a specific step
     const pickStepPhoto = async (stepIndex) => {
-        const url = await stepUpload.pickAndUpload();
-        if (url) updateStep(stepIndex, 'photo_url', url);
+        try {
+            const url = await stepUpload.pickAndUpload();
+            if (url) updateStep(stepIndex, 'photo_url', url);
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
     };
 
     // ── Hero photo ─────────────────────────────────────────────────────────────
@@ -129,8 +133,12 @@ export default function CreateScreen({ navigation, route }) {
     // file to POST /api/uploads/image, and returns the hosted URL.
     // That URL is stored in form.photo_url and sent with the recipe payload.
     const pickHeroPhoto = async () => {
-        const url = await heroUpload.pickAndUpload();
-        if (url) setField('photo_url', url);
+        try {
+            const url = await heroUpload.pickAndUpload();
+            if (url) setField('photo_url', url);
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
     };
 
     // ── Back / discard ─────────────────────────────────────────────────────────

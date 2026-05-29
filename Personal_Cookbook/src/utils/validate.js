@@ -9,10 +9,11 @@ export const validateRecipeForm = ({ title, ingredients, instructions }) => {
 
 export const validateAuthForm = ({ name, email, password }, isRegister = false) => {
     const errors = {};
-    if(isRegister && !name?.trim()) errors.name = 'Name is required';
+    const isRegistration = isRegister || name !== undefined;
+    if(isRegistration && !name?.trim()) errors.name = 'Name is required';
     if(!email?.trim()) errors.email = 'Email is required';
     else if(!validateEmail(email)) errors.email = 'Enter a valid email';
     if(!password?.trim()) errors.password = 'Password is required';
-    else if(isRegister && password.length < 6) errors.password = 'At least 6 characters';
+    else if(isRegistration && password.length < 6) errors.password = 'At least 6 characters';
     return errors;
 };

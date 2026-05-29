@@ -229,6 +229,7 @@ function ListHeader({ ingredients, total, loading, sortOption, onSortChange }) {
                     <Text style={header.countNote}>From your app + TheMealDB worldwide</Text>
                 </View>
             )}
+            <SortChips current={sortOption} onSelect={onSortChange} />
         </View>
     );
 }
@@ -329,10 +330,24 @@ export default function IngredientResultsScreen({ route, navigation }) {
         isFetching.current = true;
         try {
             const response = await searchAPI.byIngredients(ingredients, page, 10);
-            const { data, pagination: pg } = response;
+
+            // The response from our new RPC is just the array of recipes
+            const data = response;
+            const pagination = {
+                page: page,
+                // Since RPC doesn't naturally return pagination like .select(),
+                // we simulate it or you can update the RPC to return it.
+                total: data?.length || 0,
+                hasMore: false
+            };
+
             setRecipes(prev => page === 1 ? data : [...prev, ...data]);
-            setPagination(pg);
-            currentPage.current = pg.page + 1;
+            setPagination({
+                page: page,
+                total: data?.length || 0,
+                hasMore: false
+            });
+            currentPage.current = page + 1;
         } catch (err) {
             setError(err.message);
             showToast(err.message, 'error');

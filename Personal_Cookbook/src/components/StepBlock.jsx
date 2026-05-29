@@ -42,7 +42,7 @@ export default function StepBlock({ step, index, onChange, onRemove, onPickPhoto
             ) : (
                 <TouchableOpacity style={styles.photoPlaceholder} onPress={() => onPickPhoto(index)}>
                     <Feather name="camera" size={20} color={COLORS.placeholder} />
-                    <Text style={styles.photoPlaceholderText}>Add a phto for this step</Text>
+                    <Text style={styles.photoPlaceholderText}>Add a photo for this step</Text>
                 </TouchableOpacity>
             )}
         </View>
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
         borderColor: COLORS.border,
         borderRadius: 10,
         padding: 12,
-        fontFamily: FONT_SIZES.base,
+        fontFamily: FONTS.sans,
         color: COLORS.ink,
         minHeight: 80,
         marginBottom: 8,
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     photo: {
         width: '100%',
         height: 160,
-        resizeMode: 'mode',
+        resizeMode: 'cover',
         borderRadius: 10,
     },
     removePhotoBtn: {

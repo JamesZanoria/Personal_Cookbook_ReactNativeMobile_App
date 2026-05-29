@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authAPI } from '../api/auth';
 import { Storage } from '../utils/storage';
+import { supabase } from '../../supabase';
 
 const AuthContext = createContext(null);
 
@@ -9,21 +10,40 @@ export function AuthProvider({ children }){
     const [token, setToken] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // Helper to fetch the full profile from the 'users' table
+    const fetchUserProfile = async (userId) => {
+        try {
+            // Try a few times in case the database trigger is still processing
+            for (let i = 0; i < 3; i++) {
+                const profile = await authAPI.me();
+                if (profile && profile.name) return profile;
+                await sleep(500);
+            }
+            return null;
+        } catch (err) {
+            console.error('Could not fetch user profile:', err);
+            return null;
+        }
+    };
+
     // Restore session
     useEffect(() => {
         (async () => {
-            try{
-                const [storedToken, storedUser] = await Promise.all([
-                    Storage.getToken(),
-                    Storage.getUser(),
-                ]);
-                if(storedToken && storedUser){
-                    setToken(storedToken);
-                    setUser(storedUser);
+            try {
+                const storedToken = await Storage.getToken();
+                if (storedToken) {
+                    const { data: { user: authUser } } = await supabase.auth.getUser();
+                    if (authUser) {
+                        const profile = await fetchUserProfile(authUser.id);
+                        setToken(storedToken);
+                        setUser(profile || authUser);
+                    }
                 }
             } catch(err){
                 console.warn('Session restore failed:', err.message);
-            } finally{
+            } finally {
                 setLoading(false);
             }
         })();
@@ -33,32 +53,33 @@ export function AuthProvider({ children }){
     const register = async (name, email, password) => {
         const data = await authAPI.register(name, email, password);
         const session = data.session;
-        const userProfile = data.user;
+        const authUser = data.user;
 
         if (session?.access_token) {
             await Storage.setToken(session.access_token);
         }
-        if (userProfile) {
-            await Storage.setUser(userProfile);
-        }
+
+        // Wait a moment for the Supabase trigger to create the public.users row
+        await sleep(1000);
+        const profile = await fetchUserProfile(authUser?.id);
+
         setToken(session?.access_token || null);
-        setUser(userProfile || null);
+        setUser(profile || authUser);
     };
 
     // Login
     const login = async (email, password) => {
         const data = await authAPI.login(email, password);
         const session = data.session;
-        const userProfile = data.user;
+        const authUser = data.user;
 
         if (session?.access_token) {
             await Storage.setToken(session.access_token);
         }
-        if (userProfile) {
-            await Storage.setUser(userProfile);
-        }
+
+        const profile = await fetchUserProfile(authUser?.id);
         setToken(session?.access_token || null);
-        setUser(userProfile || null);
+        setUser(profile || authUser);
     };
 
     // Logout

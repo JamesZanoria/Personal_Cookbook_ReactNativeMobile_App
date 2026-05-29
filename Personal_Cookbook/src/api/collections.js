@@ -6,14 +6,71 @@ const handleResponse = (res) => {
 };
 
 export const collectionsAPI = {
-    getAll: async () =>
-        handleResponse(await supabase.from('collections').select('*')),
+    getAll: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
+        const collections = handleResponse(
+            await supabase
+                .from('collections')
+                .select('*')
+                .eq('user_id', user.id)
+        );
 
-    getOne: async (id) =>
-        handleResponse(await supabase.from('collections').select('*').eq('id', id).single()),
+        // Manually fetch recipes for each collection to avoid complex joins
+        const allCollectionsWithRecipes = await Promise.all(collections.map(async (col) => {
+            const { data: rels } = await supabase
+                .from('collection_recipes')
+                .select('recipe_id')
+                .eq('collection_id', col.id);
 
-    create: async (data) =>
-        handleResponse(await supabase.from('collections').insert(data).select()),
+            const recipeIds = rels?.map(r => r.recipe_id) || [];
+            const { data: recipes } = await supabase
+                .from('recipes')
+                .select('*')
+                .in('id', recipeIds);
+
+            return { ...col, recipes: recipes || [] };
+        }));
+
+        return allCollectionsWithRecipes;
+    },
+
+    getOne: async (id) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const collection = handleResponse(
+            await supabase
+                .from('collections')
+                .select('*')
+                .eq('id', id)
+                .eq('user_id', user.id)
+                .single()
+        );
+
+        const { data: rels } = await supabase
+            .from('collection_recipes')
+            .select('recipe_id')
+            .eq('collection_id', id);
+
+        const recipeIds = rels?.map(r => r.recipe_id) || [];
+        const { data: recipes } = await supabase
+            .from('recipes')
+            .select('*')
+            .in('id', recipeIds);
+
+        return { ...collection, recipes: recipes || [] };
+    },
+
+    create: async (data) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        return handleResponse(
+            await supabase.from('collections').insert({
+                ...data,
+                user_id: user?.id
+            }).select()
+        );
+    },
 
     update: async (id, data) =>
         handleResponse(await supabase.from('collections').update(data).eq('id', id).select()),

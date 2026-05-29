@@ -1,5 +1,6 @@
 export const FONTS = {
     serif: 'PlayfairDisplay_700Bold',
+    serifBold: 'PlayfairDisplay_700Bold',
     serifMed: 'PlayfairDisplay_600SemiBold',
     serifReg: 'PlayfairDisplay_400Regular',
     serifItalic: 'PlayfairDisplay_400Regular_Italic',

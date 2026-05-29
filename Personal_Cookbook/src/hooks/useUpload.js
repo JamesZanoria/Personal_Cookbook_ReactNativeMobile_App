@@ -32,7 +32,7 @@ export function useUpload() {
             return url;
         } catch(err){
             setError(err.message);
-            return null;
+            throw err;
         } finally{
             setUploading(false);
         }
@@ -62,7 +62,7 @@ export function useUpload() {
             return url;
         } catch(err){
             setError(err.message);
-            return null;
+            throw err;
         } finally{
             setUploading(false);
         }

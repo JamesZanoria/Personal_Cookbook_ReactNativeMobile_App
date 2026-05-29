@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { recipesAPI } from '../api/recipes';
@@ -120,33 +121,62 @@ export default function DetailScreen({ route, navigation }) {
   const isOwner = user?.id === recipe?.user_id;
 
   const handleToggleSave = async () => {
+    const previousState = { is_saved: recipe.is_saved, save_count: recipe.save_count };
+
+    // Optimistic Update
+    setRecipe((current) => ({
+      ...current,
+      is_saved: !current.is_saved,
+      save_count: Math.max((current.save_count || 0) + (current.is_saved ? -1 : 1), 0),
+    }));
+
     try {
       setSaveLoading(true);
       const result = await recipesAPI.toggleSave(recipe.id);
       setRecipe((current) => ({
         ...current,
         is_saved: result.saved,
-        save_count: result.save_count ?? Math.max((current.save_count || 0) + (result.saved ? 1 : -1), 0),
+        save_count: result.save_count ?? current.save_count,
       }));
       showToast(result.saved ? 'Saved to cookbook!' : 'Removed from cookbook');
     } catch (err) {
+      // Revert on error
+      setRecipe((current) => ({
+        ...current,
+        is_saved: previousState.is_saved,
+        save_count: previousState.save_count,
+      }));
       showToast(err.message, 'error');
     } finally {
       setSaveLoading(false);
     }
   };
 
-  // This heart action gives the recipe a persistent engagement signal used by Discover trending.
   const handleToggleLike = async () => {
+    const previousState = { is_liked: recipe.is_liked, like_count: recipe.like_count };
+
+    // Optimistic Update
+    setRecipe((current) => ({
+      ...current,
+      is_liked: !current.is_liked,
+      like_count: Math.max((current.like_count || 0) + (current.is_liked ? -1 : 1), 0),
+    }));
+
     try {
       setLikeLoading(true);
       const result = await recipesAPI.toggleLike(recipe.id);
       setRecipe((current) => ({
         ...current,
         is_liked: result.liked,
-        like_count: result.like_count ?? Math.max((current.like_count || 0) + (result.liked ? 1 : -1), 0),
+        like_count: result.like_count ?? current.like_count,
       }));
     } catch (err) {
+      // Revert on error
+      setRecipe((current) => ({
+        ...current,
+        is_liked: previousState.is_liked,
+        like_count: previousState.like_count,
+      }));
       showToast(err.message, 'error');
     } finally {
       setLikeLoading(false);
@@ -196,7 +226,7 @@ export default function DetailScreen({ route, navigation }) {
   if (!recipe) return null;
 
   return (
-    <SafeAreaView style={s.safe} edges={[]}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
         <View style={s.heroShell}>
           <Image source={{ uri: recipe.photo_url || HERO_FALLBACK }} style={s.heroImage} />
@@ -413,14 +443,13 @@ const s = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         backgroundColor: COLORS.overlayDark
     },
-    heroNav: { 
-        position: 'absolute', 
-        top: 52, 
-        left: 16, 
-        right: 16, 
-        flexDirection: 'row', 
-        justifyContent: 'space-between', 
-        alignItems: 'center' 
+    heroNav: {
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
     },
     navBtn: { 
         width: 36, 

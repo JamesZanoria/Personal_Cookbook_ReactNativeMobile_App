@@ -414,14 +414,11 @@ const styles = StyleSheet.create({
     },
     stickySelectionContent: {
         gap: 8,
-        paddingHorizontal: -16, // offset container padding to allow full width scroll
+        paddingHorizontal: 0,
     },
     // Search button
     footerContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
+        marginTop: 24,
         backgroundColor: 'rgba(247, 247, 245, 0.8)',
         paddingHorizontal: 16,
         paddingBottom: 34, // Space for home indicator on modern devices
